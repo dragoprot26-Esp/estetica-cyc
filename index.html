@@ -625,7 +625,7 @@ const App = (()=>{
     $('turnoForm').style.display='none'; $('turnoOk').style.display='block'; }
   let _ult=null;
   function msgTurno(){ const i=inq(); return '¡Hola '+i.nombre+'! Reservé un turno.\n\nCódigo: '+_ult.codigo+'\nServicio: '+_ult.servNombre+'\nDía: '+_ult.dia+' '+_ult.hora+' h\nNombre: '+_ult.cliente+'\nTel: '+_ult.tel; }
-  function enviarWA(){ if(!_ult) return; const num=String(inq().wa||'').replace(/[^0-9]/g,''); if(!num){ alert('El local todavía no cargó su WhatsApp.'); return; } window.open('https://wa.me/'+num+'?text='+encodeURIComponent(msgTurno()),'_blank'); }
+  function enviarWA(){ if(!_ult) return; const num=numeroWA(); if(!num){ alert('El local todavía no cargó su WhatsApp.'); return; } window.open('https://wa.me/'+num+'?text='+encodeURIComponent(msgTurno()),'_blank'); }
   function enviarMail(){ if(!_ult) return; const i=inq(); window.location.href='mailto:'+encodeURIComponent(i.mail||'')+'?subject='+encodeURIComponent('Turno '+_ult.codigo+' — '+i.nombre)+'&body='+encodeURIComponent(msgTurno()); }
 
   /* ---- Dashboard ---- */
@@ -700,7 +700,8 @@ const App = (()=>{
   function actualizarBadgeResenas(){ const b=$('rvBadge'); if(!b) return; const n=(D.resenas||[]).filter(r=>!r.aprobada).length; if(n>0){ b.textContent=n; b.style.display='inline-block'; } else b.style.display='none'; }
 
   /* ---- Público: acciones ---- */
-  function wa(){ window.open('https://wa.me/'+inq().wa+'?text='+encodeURIComponent('Hola! Quiero reservar un turno en '+inq().nombre),'_blank'); }
+  function numeroWA(){ const i=inq(); const w=String(i.wa||'').replace(/[^0-9]/g,''); if(w.length>=11) return w; const t=String(i.tel||'').replace(/[^0-9]/g,'').replace(/^0/,'').replace(/^15/,''); if(t) return '549'+t; return w; }
+  function wa(){ const num=numeroWA(); if(!num){ alert('El local todavía no cargó su WhatsApp.'); return; } window.open('https://wa.me/'+num+'?text='+encodeURIComponent('Hola! Quiero reservar un turno en '+inq().nombre),'_blank'); }
   function ubicacion(){ window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(inq().dir),'_blank'); }
   function linkPublico(){ const base=location.origin+location.pathname.replace(/[^/]*$/,''); return _codigo?(base+'?codigo='+encodeURIComponent(_codigo)):location.href; }
   async function compartir(){ const url=linkPublico(); const datos={title:inq().nombre,text:'Mirá los tratamientos de '+inq().nombre,url}; if(navigator.share){try{await navigator.share(datos);}catch(e){}} else {try{await navigator.clipboard.writeText(url);alert('🔗 Link copiado.');}catch(e){prompt('Copiá el link:',url);}} }
@@ -721,9 +722,4 @@ const App = (()=>{
   boot();
   return { abrirPanel,cerrarPanel,verPublico,volverPanel,rol,login,tab,tema,guardarTextos,subirHero,addGaleria,delGaleria, addCat,delCat, nuevoItem,editItem,delItem,subirFoto,addExtra,setExtra,delExtra,guardarItem,toggleProdOn,
     toggleDia,addHora,delHora,marcarTurno,borrarTurno, abrirTurno,masDias,selDia,selHora,confirmarTurno,enviarWA,enviarMail,
-    dashPer,exportar,limpiar, addColab,aprobarColab,kickColab,delColab, selInq,aprobarInq,kickInq,guardarConfig, wa,ubicacion,compartir,qr,descargarQR,cerrar, cargarBackups,guardarCopia,restaurarCopia, abrirResena,setStar,enviarResena,aceptarResena,ocultarResena,borrarResena };
-})();
-if('serviceWorker' in navigator){ window.addEventListener('load',function(){ navigator.serviceWorker.register('/sw.js').catch(function(){}); }); }
-</script>
-</body>
-</html>
+    dashPer,exportar,limpiar, addColab,aprobarColab,kickColab,delColab, selInq,aprobarInq,kickInq,guardarConfig, wa,ubicacion,compartir,qr,descargarQR,cerrar, cargarBackup
