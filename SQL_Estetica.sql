@@ -46,7 +46,10 @@ begin
     'cats', d->'cats',
     'serv', d->'serv',
     'prod', d->'prod',
-    'turnosCfg', d->'turnosCfg'
+    'turnosCfg', d->'turnosCfg',
+    'resenas', (select coalesce(jsonb_agg(r), '[]'::jsonb)
+                from jsonb_array_elements(coalesce(d->'resenas','[]'::jsonb)) r
+                where coalesce((r->>'aprobada')::boolean, false))
   );
 end $$;
 grant execute on function public.estetica_publica(text) to anon, authenticated;
@@ -64,6 +67,21 @@ begin
   return jsonb_build_object('ok', true);
 end $$;
 grant execute on function public.estetica_agregar_turno(text, jsonb) to anon, authenticated;
+
+-- 3b) Público: el cliente deja una opinión (queda PENDIENTE de aprobar) ---
+create or replace function public.estetica_agregar_resena(p_codigo text, p_resena jsonb)
+returns jsonb language plpgsql security definer set search_path = public as $$
+begin
+  update public.estetica_backups
+     set datos = jsonb_set(datos, '{resenas}',
+           coalesce(datos->'resenas', '[]'::jsonb)
+             || jsonb_build_array((p_resena - 'aprobada') || jsonb_build_object('aprobada', false))),
+         updated_at = now()
+   where tenant_id = p_codigo;
+  if not found then return jsonb_build_object('ok', false, 'error', 'sin_local'); end if;
+  return jsonb_build_object('ok', true);
+end $$;
+grant execute on function public.estetica_agregar_resena(text, jsonb) to anon, authenticated;
 
 -- 4) Colaboradores: verificar (sin login) y unirse (con login) ----------
 --    El colaborador entra solo si el dueño ya lo aceptó (estado = aprobado).
