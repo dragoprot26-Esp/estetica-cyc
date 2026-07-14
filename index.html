@@ -553,8 +553,8 @@ const App = (()=>{
     if(s==='servicios'){renderCats('serv');renderList('serv');}
     if(s==='productos'){renderCats('prod');renderList('prod');$('btnProdOn').textContent=D.cfg.prodOn?'✔':'◯';}
     if(s==='temas'){document.querySelectorAll('#temasBtns .chip2').forEach(b=>b.classList.toggle('on',b.dataset.t===D.cfg.tema)); cargarTextos(); renderHeroPrev(); renderGalEditor();}
-    if(s==='turnos'){renderTurnosCfg();renderTurnosList();}
-    if(s==='dashboard'){dashPer(_per);}
+    if(s==='turnos'){renderTurnosCfg();refrescarTurnos();}
+    if(s==='dashboard'){(async()=>{ await refrescarTurnos(); dashPer(_per); })();}
     if(s==='colab'){renderColab();}
     if(s==='config'){renderConfig();}
     if(s==='backup'){cargarBackups();}
@@ -596,6 +596,7 @@ const App = (()=>{
     $('listTurnos').innerHTML=arr.length?arr.map(t=>`<div class="tcard"><div style="display:flex;justify-content:space-between;align-items:center"><span class="cod">${esc(t.codigo)}</span><span class="badge ${t.estado==='atendido'?'ok':'pend'}">${t.estado}</span></div><div style="font-size:.86rem;margin-top:.2rem">${esc(t.servNombre)} · <b>${esc(t.dia)} ${esc(t.hora)}</b></div><div style="font-size:.8rem;color:var(--mut)">${esc(t.cliente)} · ${esc(t.tel)} · ${fmt(t.precio)}</div><div style="display:flex;gap:.4rem;margin-top:.5rem">${t.estado!=='atendido'?`<button class="btn btn-o" style="padding:.35rem .7rem" onclick="App.marcarTurno('${t.codigo}')">Marcar atendido</button>`:''}<button class="btn btn-d" style="padding:.35rem .7rem" onclick="App.borrarTurno('${t.codigo}')">Borrar</button></div></div>`).join(''):'<p class="note">Todavía no hay turnos.</p>'; }
   function marcarTurno(cod){ const t=D.turnos.find(x=>x.codigo===cod); if(t){t.estado='atendido';save();renderTurnosList();} }
   function borrarTurno(cod){ if(confirm('¿Borrar turno?')){ D.turnos=D.turnos.filter(x=>x.codigo!==cod); save(); renderTurnosList(); } }
+  async function refrescarTurnos(){ try{ if(_codigo && Cloud.logueado()){ const full=await Cloud.cargar(_codigo); if(full&&Array.isArray(full.turnos)) D.turnos=full.turnos; } }catch(e){} renderTurnosList(); }
 
   /* ---- Reserva pública ---- */
   let _sel={serv:null,dia:null,hora:null}, _diasN=8; const _diasScan=62;
@@ -623,9 +624,9 @@ const App = (()=>{
     $('okCod').textContent=cod; $('okDet').innerHTML=`${esc(s.nombre)}<br><b>${esc(_sel.diaEt)} · ${esc(_sel.hora)} h</b><br>${esc(nombre)} · ${esc(tel)}`;
     $('turnoForm').style.display='none'; $('turnoOk').style.display='block'; }
   let _ult=null;
-  function msgTurno(){ const i=inq(); return `¡Hola ${i.nombre}! Reservé un turno.%0A%0ACódigo: ${_ult.codigo}%0AServicio: ${_ult.servNombre}%0ADía: ${_ult.dia} ${_ult.hora} h%0ANombre: ${_ult.cliente}%0ATel: ${_ult.tel}`; }
-  function enviarWA(){ if(!_ult)return; window.open('https://wa.me/'+inq().wa+'?text='+msgTurno(),'_blank'); }
-  function enviarMail(){ if(!_ult)return; const i=inq(); window.location.href='mailto:'+encodeURIComponent(i.mail||'')+'?subject='+encodeURIComponent('Turno '+_ult.codigo+' — '+i.nombre)+'&body='+msgTurno().replace(/%0A/g,'%0D%0A'); }
+  function msgTurno(){ const i=inq(); return '¡Hola '+i.nombre+'! Reservé un turno.\n\nCódigo: '+_ult.codigo+'\nServicio: '+_ult.servNombre+'\nDía: '+_ult.dia+' '+_ult.hora+' h\nNombre: '+_ult.cliente+'\nTel: '+_ult.tel; }
+  function enviarWA(){ if(!_ult) return; const num=String(inq().wa||'').replace(/[^0-9]/g,''); if(!num){ alert('El local todavía no cargó su WhatsApp.'); return; } window.open('https://wa.me/'+num+'?text='+encodeURIComponent(msgTurno()),'_blank'); }
+  function enviarMail(){ if(!_ult) return; const i=inq(); window.location.href='mailto:'+encodeURIComponent(i.mail||'')+'?subject='+encodeURIComponent('Turno '+_ult.codigo+' — '+i.nombre)+'&body='+encodeURIComponent(msgTurno()); }
 
   /* ---- Dashboard ---- */
   let _per='dia';
