@@ -4,7 +4,7 @@
  *  - Supabase u otros orígenes: pasan de largo (no se cachean).
  * Subir la versión (CACHE) limpia lo viejo al publicar cambios.
  */
-const CACHE = 'estetica-v1';
+const CACHE = 'estetica-v2';
 const SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', (e) => {
