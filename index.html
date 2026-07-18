@@ -453,16 +453,18 @@ const Cloud = (()=>{
   async function cargar(c){ const b=(await token())||SB_KEY; try{ const r=await fetch(SB_URL+'/rest/v1/estetica_backups?tenant_id=eq.'+encodeURIComponent(c)+'&select=datos&limit=1',{cache:'no-store',headers:{apikey:SB_KEY,Authorization:'Bearer '+b}}); if(!r.ok) return null; const rows=await r.json(); return (rows&&rows.length&&rows[0].datos)?rows[0].datos:{}; }catch(e){ return null; } }
   async function guardarNube(c,datos){ const b=(await token())||SB_KEY; try{ const r=await fetch(SB_URL+'/rest/v1/estetica_backups',{method:'POST',headers:{apikey:SB_KEY,Authorization:'Bearer '+b,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates'},body:JSON.stringify({tenant_id:c,datos,updated_at:new Date().toISOString()})}); return r.ok; }catch(e){ return false; } }
   async function publica(c){ try{ return await rpc('estetica_publica',{p_codigo:c},false); }catch(e){ return null; } }
+  async function version(c){ try{ const r=await rpc('estetica_version',{p_codigo:c},false); return typeof r==='string'?r:String(r||''); }catch(e){ return ''; } }
   async function agregarTurno(c,t){ try{ await rpc('estetica_agregar_turno',{p_codigo:c,p_turno:t},false); }catch(e){} }
   async function agregarResena(c,r){ try{ await rpc('estetica_agregar_resena',{p_codigo:c,p_resena:r},false); return true; }catch(e){ return false; } }
   async function cancelarTurno(c,cod){ try{ return await rpc('estetica_cancelar_turno',{p_codigo:c,p_cod_turno:cod},false); }catch(e){ return {ok:false}; } }
   async function histListar(c){ try{ const r=await rpc('estetica_hist_listar',{p_codigo:c}); return Array.isArray(r)?r:[]; }catch(e){ return []; } }
   async function histRestaurar(c,id){ try{ const r=await rpc('estetica_hist_restaurar',{p_codigo:c,p_id:id}); return (r&&r.ok)?r.datos:null; }catch(e){ return null; } }
   async function histSnapshot(c){ try{ const r=await rpc('estetica_hist_snapshot',{p_codigo:c}); return !!(r&&r.ok); }catch(e){ return false; } }
-  return { logueado,salir,validarLicencia,duenoEntrar,colabEntrar,miMembresia,cargar,guardarNube,publica,agregarTurno,agregarResena,cancelarTurno,histListar,histRestaurar,histSnapshot };
+  return { logueado,salir,validarLicencia,duenoEntrar,colabEntrar,miMembresia,cargar,guardarNube,publica,version,agregarTurno,agregarResena,cancelarTurno,histListar,histRestaurar,histSnapshot };
 })();
 
 const App = (()=>{
+  let _lastVer='';
   const $=id=>document.getElementById(id);
   const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   const fmt=n=>'$'+Number(n||0).toLocaleString('es-AR');
@@ -599,7 +601,7 @@ const App = (()=>{
     $('listTurnos').innerHTML=arr.length?arr.map(t=>`<div class="tcard"><div style="display:flex;justify-content:space-between;align-items:center"><span class="cod">${esc(t.codigo)}</span><span class="badge ${t.estado==='atendido'?'ok':'pend'}">${t.estado}</span></div><div style="font-size:.86rem;margin-top:.2rem">${esc(t.servNombre)} · <b>${esc(t.dia)} ${esc(t.hora)}</b></div><div style="font-size:.8rem;color:var(--mut)">${esc(t.cliente)} · ${esc(t.tel)} · ${fmt(t.precio)}</div><div style="display:flex;gap:.4rem;margin-top:.5rem;flex-wrap:wrap"><button class="btn btn-g" style="padding:.35rem .7rem" onclick="App.enviarCodigoCliente('${t.codigo}')">📲 Enviar código</button>${t.estado!=='atendido'?`<button class="btn btn-o" style="padding:.35rem .7rem" onclick="App.marcarTurno('${t.codigo}')">Marcar atendido</button>`:''}<button class="btn btn-d" style="padding:.35rem .7rem" onclick="App.borrarTurno('${t.codigo}')">Borrar</button></div></div>`).join(''):'<p class="note">Todavía no hay turnos.</p>'; }
   function marcarTurno(cod){ const t=D.turnos.find(x=>x.codigo===cod); if(t){t.estado='atendido';save();renderTurnosList();} }
   function borrarTurno(cod){ if(confirm('¿Borrar turno?')){ D.turnos=D.turnos.filter(x=>x.codigo!==cod); save(); renderTurnosList(); } }
-  async function refrescarTurnos(){ try{ if(_codigo && Cloud.logueado()){ const full=await Cloud.cargar(_codigo); if(full&&Array.isArray(full.turnos)) D.turnos=full.turnos; } }catch(e){} renderTurnosList(); }
+  async function refrescarTurnos(){ try{ if(_codigo && Cloud.logueado()){ const v=await Cloud.version(_codigo); if(v && v!==_lastVer){ _lastVer=v; const full=await Cloud.cargar(_codigo); if(full){ if(Array.isArray(full.turnos)) D.turnos=full.turnos; if(Array.isArray(full.resenas)) D.resenas=full.resenas; } } } }catch(e){} renderTurnosList(); }
 
   /* ---- Reserva pública ---- */
   let _sel={serv:null,dia:null,hora:null}, _diasN=8; const _diasScan=62;
@@ -692,7 +694,7 @@ const App = (()=>{
   function renderResenas(){ const c=$('listResenas'); if(!c) return; const arr=(D.resenas||[]).slice().reverse();
     c.innerHTML=arr.length?arr.map(r=>{ const i=(D.resenas||[]).indexOf(r); const pend=!r.aprobada;
       return `<div class="tcard"><div style="display:flex;justify-content:space-between;align-items:center"><span class="stars" style="color:var(--acc)">${'★'.repeat(Math.max(1,Math.min(5,r.estrellas||5)))}</span><span class="badge ${pend?'pend':'ok'}">${pend?'pendiente':'publicada'}</span></div><p style="font-family:'Cormorant Garamond',serif;font-style:italic;margin:.3rem 0;color:var(--ink)">"${esc(r.texto)}"</p><div style="font-size:.78rem;color:var(--mut)">${esc(r.nombre||'Cliente')}</div><div style="display:flex;gap:.4rem;margin-top:.5rem">${pend?`<button class="btn btn-g" style="padding:.35rem .7rem" onclick="App.aceptarResena(${i})">Aceptar</button>`:`<button class="btn btn-o" style="padding:.35rem .7rem" onclick="App.ocultarResena(${i})">Ocultar</button>`}<button class="btn btn-d" style="padding:.35rem .7rem" onclick="App.borrarResena(${i})">Borrar</button></div></div>`; }).join(''):'<p class="note">Todavía no hay opiniones de clientes.</p>'; }
-  async function refrescarResenas(){ try{ if(_codigo && Cloud.logueado()){ const full=await Cloud.cargar(_codigo); if(full&&Array.isArray(full.resenas)) D.resenas=full.resenas; } }catch(e){} renderResenas(); actualizarBadgeResenas(); }
+  async function refrescarResenas(){ try{ if(_codigo && Cloud.logueado()){ const v=await Cloud.version(_codigo); if(v && v!==_lastVer){ _lastVer=v; const full=await Cloud.cargar(_codigo); if(full){ if(Array.isArray(full.resenas)) D.resenas=full.resenas; if(Array.isArray(full.turnos)) D.turnos=full.turnos; } } } }catch(e){} renderResenas(); actualizarBadgeResenas(); }
   function aceptarResena(i){ if(D.resenas[i]){ D.resenas[i].aprobada=true; save(); renderResenas(); renderPublic(); } }
   function ocultarResena(i){ if(D.resenas[i]){ D.resenas[i].aprobada=false; save(); renderResenas(); renderPublic(); } }
   function borrarResena(i){ if(confirm('¿Borrar esta opinión?')){ D.resenas.splice(i,1); save(); renderResenas(); renderPublic(); } }
